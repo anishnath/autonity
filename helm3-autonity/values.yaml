@@ -1,0 +1,103 @@
+image:
+  repository: "ghcr.io/autonity/autonity"
+  tag: latest
+  pullPolicy: IfNotPresent
+
+
+http:
+  port: 8545
+  api: "aut,eth,net,txpool,web3,admin"
+  vhosts: "*"
+ws:
+  port: 8546
+  api: "aut,eth,net,txpool,web3,admin"
+  origins: "*"
+
+proxy:
+  http:
+    port: 9545
+  ws:
+    port: 9546
+
+networkId: 65100000
+piccadilly: true
+bakerloo: false
+
+syncMode: "full"
+
+maxPeers: 50
+cache: 4096
+customArgs: {}
+
+service:
+  type: ClusterIP
+  annotations: {}
+    # service.beta.kubernetes.io/aws-load-balancer-internal: ...
+
+ingress:
+  certmanagerClusterIssuer: letsencrypt-prod
+  enabled: false
+  rpc:
+    proxyHosts:
+    - rpc.autonity.com
+    hosts:
+    - secret-rpc.autonity.com
+  ws:
+    proxyHosts:
+    - ws.autonity.com
+    hosts:
+    - secret-ws.autonity.com
+
+persistence:
+  # snapshotValue: ""
+  size: 1Gi
+  storageClassName: standard-rwo
+
+resources: {}
+  # limits:
+  #   cpu: 1000m
+  #   memory: 2000Mi
+  # requests:
+  #   cpu: 1000m
+  #   memory: 2000Mi
+
+## Autoscaling parameters
+##
+autoscaling:
+  enabled: false
+  # minReplicas: 1
+  # maxReplicas: 10
+  # targetCPU: 50
+  # targetMemory: 50
+
+livenessProbe:
+  enabled: false
+  initialDelaySeconds: 120
+  periodSeconds: 60
+  successThreshold: 1
+  failureThreshold: 3
+  timeoutSeconds: 15
+  exec:
+    command: |
+      - sh
+      - -c
+      - "echo -e 'POST / HTTP/1.1\nHost: localhost:8545\nUser-Agent: curl/7.61.1\nAccept: */*\nContent-Type: application/json\nContent-Length: 60\n\n{\"jsonrpc\":\"2.0\",\"method\":\"net_version\",\"params\":[],\"id\":67}' | nc localhost 8545 | grep -q 'HTTP/1.1 200 OK' && echo -e 'GET / HTTP/1.1\nHost: localhost:8546\nUpgrade: websocket\nConnection: Upgrade\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\nSec-WebSocket-Version: 13\n' | nc localhost 8546 | grep -q 'HTTP/1.1 101'"
+
+readinessProbe:
+  enabled: false
+  initialDelaySeconds: 60
+  periodSeconds: 60
+  successThreshold: 1
+  failureThreshold: 30
+  timeoutSeconds: 10
+  exec:
+    command: |
+      - sh
+      - -c
+      - "autonity {{ if .Values.piccadilly }} --piccadilly {{ end }} {{ if .Values.bakerloo }} --bakerloo {{ end }} attach --exec '!eth.syncing || eth.syncing.highestBlock-eth.syncing.currentBlock < 100' | grep -q true && return 0 || return 1"
+
+affinity: {}
+
+nodeSelector: {}
+
+tolerations: []

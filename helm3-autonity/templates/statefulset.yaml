@@ -1,0 +1,110 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ template "autonity.fullname" . }}
+  labels:
+    app: {{ template "autonity.name" . }}
+    chart: {{ template "autonity.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  serviceName: {{ template "autonity.name" . }}
+  selector:
+    matchLabels:
+      app: {{ template "autonity.name" . }}
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ template "autonity.name" . }}
+        release: {{ .Release.Name }}
+        {{- include "autonity.statefulset.annotations" . | nindent 8 }}
+    spec:
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+      - name: remove-lock
+        command:
+        - rm
+        - -f
+        - /root/.autonity/autonity/LOCK
+        image: busybox
+        imagePullPolicy: IfNotPresent
+        volumeMounts:
+        - name: data
+          mountPath: /root
+      - name: remove-nodekey
+        command:
+        - rm
+        - -f
+        - /root/.autonity/autonity/nodekey
+        image: busybox
+        imagePullPolicy: IfNotPresent
+        volumeMounts:
+        - name: data
+          mountPath: /root
+      containers:
+      {{- if .Values.proxy.enabled }}
+      - name: {{ template "autonity.fullname" . }}-proxy
+        image: "{{ .Values.proxy.image.repository }}:{{ .Values.proxy.image.tag }}"
+        imagePullPolicy: {{ .Values.proxy.image.pullPolicy | quote }}
+        ports:
+        - name: proxy-rpc
+          containerPort: {{ .Values.proxy.http.port }}
+        - name: proxy-ws
+          containerPort: {{ .Values.proxy.ws.port }}
+        env:
+        - name: OTP_SECRET
+          value: {{ .Values.proxy.otpSecret | quote }}
+      {{- end }}
+      - name: {{ template "autonity.fullname" . }}
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy | quote }}
+        command: ["/usr/local/bin/autonity"]
+        args: {{- include "autonity.args" . | nindent 10 }}
+        ports:
+        - name: rpc
+          containerPort: {{ .Values.http.port }}
+        - name: ws
+          containerPort: {{ .Values.ws.port }}
+        {{- if .Values.livenessProbe.enabled }}
+        livenessProbe:
+          {{- if and .Values.livenessProbe.exec (kindIs "string" .Values.livenessProbe.exec.command) }}
+          {{- omit .Values.livenessProbe "enabled" "exec" | toYaml | nindent 10 }}
+          exec:
+            command:
+              {{- tpl .Values.livenessProbe.exec.command . | nindent 14 }}
+          {{- else }}
+          {{- omit .Values.livenessProbe "enabled" | toYaml | nindent 10 }}
+          {{- end }}
+        {{- end }}
+        {{- if .Values.readinessProbe.enabled }}
+        readinessProbe:
+          {{- if and .Values.readinessProbe.exec (kindIs "string" .Values.readinessProbe.exec.command) }}
+          {{- omit .Values.readinessProbe "enabled" "exec" | toYaml | nindent 10 }}
+          exec:
+            command:
+              {{- tpl .Values.readinessProbe.exec.command . | nindent 14 }}
+          {{- else }}
+          {{- omit .Values.readinessProbe "enabled" | toYaml | nindent 10 }}
+          {{- end }}
+        {{- end }}
+        volumeMounts:
+        - name: data
+          mountPath: /root
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+      volumes:
+      - name: data
+        emptyDir:
+          sizeLimit: 500Mi

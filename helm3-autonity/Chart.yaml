@@ -1,0 +1,18 @@
+apiVersion: v2
+name: autonity
+description: autonity protocol
+
+version: 0.0.1
+appVersion: v0.0.1
+
+keywords:
+  - autonity
+  - cryptocurrency
+  - blockchain
+home: https://autonity.org/
+icon: https://autonity.org/img/autonity-logo.png
+sources:
+  - https://github.com/autonity/autonity
+maintainers:
+  - name: Anish Nath
+    email: anish2good@yahoo.co.in

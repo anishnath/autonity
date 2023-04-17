@@ -1,0 +1,19 @@
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pvo.0
+  labels:
+    app: {{ template "autonity.name" . }}
+    chart: {{ template "autonity.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  capacity:
+    storage: 1Gi
+  hostPath:
+    path: $(pwd)/autonity-chaindata
+    type: Directory
+  persistentVolumeReclaimPolicy: Retain
