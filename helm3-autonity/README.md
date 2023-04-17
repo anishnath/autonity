@@ -1,4 +1,4 @@
-# Ethereum Public Network
+# Autonity Public Network
 
 [autonity](https://autonity.ethereum.org) is official Go implementation of the Ethereum protocol
 
